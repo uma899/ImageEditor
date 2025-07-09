@@ -4,7 +4,6 @@ import cv2
 
 def save_numpy_array_as_image(np_array, output_path):
     try:
-        # Ensure the array is of type uint8 for saving as an image
         img_to_save = np_array.astype(np.uint8)
         cv2.imwrite(output_path, img_to_save)
         print(f"Successfully saved NumPy array as image to '{output_path}'")
@@ -28,34 +27,25 @@ def load_image_to_numpy_array(image_path):
 def calculateAvg(kernel, imgArr, pix, imgShape):
     offsetDiag = kernel // 2
 
-    # Calculate the start and end coordinates for the kernel window
     start_x = pix["x"] - offsetDiag
     start_y = pix["y"] - offsetDiag
     end_x = pix["x"] + offsetDiag
     end_y = pix["y"] + offsetDiag
 
-    sum_channels = [0.0, 0.0, 0.0] # Use floats for summation
+    sum_channels = [0.0, 0.0, 0.0]
     toDivide = 0
 
-    # Iterate through the kernel window
     for y_coord in range(start_y, end_y + 1):
         for x_coord in range(start_x, end_x + 1):
-            # Check for boundary conditions
             if 0 <= y_coord < imgShape[0] and 0 <= x_coord < imgShape[1]:
                 currPix = imgArr[y_coord][x_coord]
                 sum_channels[0] += currPix[0]
                 sum_channels[1] += currPix[1]
                 sum_channels[2] += currPix[2]
                 toDivide += 1
-            # else:
-            #     # If a pixel is out of bounds, you might choose to pad (e.g., with zeros, replicate border, etc.)
-            #     # For a simple average blur, skipping out-of-bounds pixels is common for "valid" padding,
-            #     # but can lead to darker edges if not handled by reducing `toDivide` for those cases.
-            #     # Your current implementation effectively skips them, which is okay for a basic blur.
-    
-    # Avoid division by zero if toDivide is 0 (shouldn't happen with valid kernels and images)
+
     if toDivide == 0:
-        return [0.0, 0.0, 0.0] # Or the original pixel value, depending on desired behavior
+        return [0.0, 0.0, 0.0]
 
     return [sum_channels[0] / toDivide, sum_channels[1] / toDivide, sum_channels[2] / toDivide]
 
@@ -68,18 +58,15 @@ if __name__ == "__main__":
     else:
         imgShape = imgArr.shape
 
-        kernel = 21 # 3x3 kernel for averaging
+        kernel = 9
         
-        # Initialize newImg with the same shape but with float type for accurate averaging
-        # It's better to initialize it as float and then convert to uint8 before saving
         newImg = np.zeros_like(imgArr, dtype=np.float32) 
 
-        for i in range(imgShape[0]): # Iterate over rows (y-coordinate)
-            for j in range(imgShape[1]): # Iterate over columns (x-coordinate)
-                # Pass the current pixel coordinates
+        for i in range(imgShape[0]): 
+            for j in range(imgShape[1]): 
                 newImg[i][j] = calculateAvg(kernel, imgArr, {"y": i, "x": j}, imgShape)
         
-        # Convert the processed image to uint8 before saving
+
         save_numpy_array_as_image(newImg, './test2.jpg')
 
 """
