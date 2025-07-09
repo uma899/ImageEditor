@@ -1,20 +1,11 @@
 import numpy as np
-import cv2 # Import the OpenCV library
+import cv2
 
 
 def save_numpy_array_as_image(np_array, output_path):
-    """
-    Saves a NumPy array as an image file using OpenCV.
-    OpenCV expects images in BGR format for saving.
-
-    Args:
-        np_array (numpy.ndarray): The NumPy array containing image data.
-                                  Can be RGB (height, width, 3) or Grayscale (height, width).
-        output_path (str): The path to save the output image file (e.g., 'output.png').
-    """
     try:
-        img_to_save = np_array
-
+        # Ensure the array is of type uint8 for saving as an image
+        img_to_save = np_array.astype(np.uint8)
         cv2.imwrite(output_path, img_to_save)
         print(f"Successfully saved NumPy array as image to '{output_path}'")
     except Exception as e:
@@ -27,32 +18,88 @@ def load_image_to_numpy_array(image_path):
         if img_array_bgr is None:
             print(f"Error: Could not load image from '{image_path}'. Check if path is correct and image exists.")
             return None
-        print(f"Successfully loaded '{image_path}' to NumPy array (BGR format).")  # (height, width, channels).
+        print(f"Successfully loaded '{image_path}' to NumPy array (BGR format).")
         print(f"Loaded image array shape: {img_array_bgr.shape}")
         return img_array_bgr
     except Exception as e:
         print(f"An error occurred while loading image: {e}")
         return None
 
-# --- Example Usage ---
+def calculateAvg(kernel, imgArr, pix, imgShape):
+    offsetDiag = kernel // 2
+
+    # Calculate the start and end coordinates for the kernel window
+    start_x = pix["x"] - offsetDiag
+    start_y = pix["y"] - offsetDiag
+    end_x = pix["x"] + offsetDiag
+    end_y = pix["y"] + offsetDiag
+
+    sum_channels = [0.0, 0.0, 0.0] # Use floats for summation
+    toDivide = 0
+
+    # Iterate through the kernel window
+    for y_coord in range(start_y, end_y + 1):
+        for x_coord in range(start_x, end_x + 1):
+            # Check for boundary conditions
+            if 0 <= y_coord < imgShape[0] and 0 <= x_coord < imgShape[1]:
+                currPix = imgArr[y_coord][x_coord]
+                sum_channels[0] += currPix[0]
+                sum_channels[1] += currPix[1]
+                sum_channels[2] += currPix[2]
+                toDivide += 1
+            # else:
+            #     # If a pixel is out of bounds, you might choose to pad (e.g., with zeros, replicate border, etc.)
+            #     # For a simple average blur, skipping out-of-bounds pixels is common for "valid" padding,
+            #     # but can lead to darker edges if not handled by reducing `toDivide` for those cases.
+            #     # Your current implementation effectively skips them, which is okay for a basic blur.
+    
+    # Avoid division by zero if toDivide is 0 (shouldn't happen with valid kernels and images)
+    if toDivide == 0:
+        return [0.0, 0.0, 0.0] # Or the original pixel value, depending on desired behavior
+
+    return [sum_channels[0] / toDivide, sum_channels[1] / toDivide, sum_channels[2] / toDivide]
+
+
 if __name__ == "__main__":
     imgArr = load_image_to_numpy_array("./test.jpg")
 
+    if imgArr is None:
+        print("Image loading failed. Exiting.")
+    else:
+        imgShape = imgArr.shape
+
+        kernel = 21 # 3x3 kernel for averaging
+        
+        # Initialize newImg with the same shape but with float type for accurate averaging
+        # It's better to initialize it as float and then convert to uint8 before saving
+        newImg = np.zeros_like(imgArr, dtype=np.float32) 
+
+        for i in range(imgShape[0]): # Iterate over rows (y-coordinate)
+            for j in range(imgShape[1]): # Iterate over columns (x-coordinate)
+                # Pass the current pixel coordinates
+                newImg[i][j] = calculateAvg(kernel, imgArr, {"y": i, "x": j}, imgShape)
+        
+        # Convert the processed image to uint8 before saving
+        save_numpy_array_as_image(newImg, './test2.jpg')
+
+"""
+
+# Negative
+    for i in range(0, 853):
+        for j in range(0, 1280):
+            temp = imgArr[i][j]
+            temp[0] = 255 - temp[0]
+            temp[1] = 255 - temp[1]
+            temp[2] = 255 - temp[2]
+            imgArr[i][j] = temp   
+
+
+
+# Saturation
     sat = 100
     temp = [0, 0 ,0]
 
     def rgb_to_hsv_opencv_ranges(R, G, B):
-        """
-        Manually converts an RGB color (0-255 range) to HSV (OpenCV's 0-179, 0-255, 0-255 ranges).
-
-        Args:
-            R (int): Red component (0-255).
-            G (int): Green component (0-255).
-            B (int): Blue component (0-255).
-
-        Returns:
-            tuple: (H, S, V) tuple, where H is 0-179, S is 0-255, V is 0-255.
-        """
         # 1. Normalize RGB to 0-1 range
         r_norm = R / 255.0
         g_norm = G / 255.0
@@ -95,17 +142,6 @@ if __name__ == "__main__":
         return (H_opencv, S_opencv, V_opencv)
 
     def hsv_to_rgb_opencv_ranges(H, S, V):
-        """
-        Manually converts an HSV color (OpenCV's 0-179, 0-255, 0-255 ranges) to RGB (0-255 range).
-
-        Args:
-            H (int): Hue component (0-179).
-            S (int): Saturation component (0-255).
-            V (int): Value component (0-255).
-
-        Returns:
-            tuple: (R, G, B) tuple, where R, G, B are 0-255.
-        """
         # 1. Normalize H, S, V to common ranges (H: 0-360, S: 0-1, V: 0-1)
         h_norm = H * 2.0  # Scale H from 0-179 to 0-359.99... degrees
         s_norm = S / 255.0 # Scale S from 0-255 to 0-1
@@ -169,10 +205,7 @@ if __name__ == "__main__":
             #temp = [tem2[0], tem2[1] - sat, tem2[2]]
             imgArr[i][j] = hsv_to_rgb_opencv_ranges(tem2[0], tem2[1] - sat, tem2[2])
 
-    save_numpy_array_as_image(imgArr, './test2.jpg')
 
-
-"""
 # Darkness
     dark = 1 - 0.1
     for i in range(0, 853):
@@ -183,14 +216,7 @@ if __name__ == "__main__":
             temp[2] = temp[2] - int(dark*temp[2])
             imgArr[i][j] = temp
 
-# Negative
-    for i in range(0, 853):
-        for j in range(0, 1280):
-            temp = imgArr[i][j]
-            temp[0] = 255 - temp[0]
-            temp[1] = 255 - temp[1]
-            temp[2] = 255 - temp[2]
-            imgArr[i][j] = temp            
+         
 
 # De pixel
     pixSize = 50
